@@ -1,0 +1,13 @@
+{
+  "name": "prove-build",
+  "command": ["sh", "-lc", "mkdir -p dist && printf 'artifact\n' > dist/app.txt"],
+  "workdir": ".",
+  "timeout_seconds": 30,
+  "recover_command": ["sh", "-lc", "mkdir -p dist && printf 'recovered\n' > dist/app.txt"],
+  "checks": {
+    "files_exist": ["dist/app.txt"],
+    "files_changed": ["dist/app.txt"],
+    "commands": ["test -s dist/app.txt"],
+    "timeout_seconds": 10
+  }
+}

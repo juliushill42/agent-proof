@@ -1,0 +1,4 @@
+bin/
+.agent-proof/
+dist/
+*.tmp
