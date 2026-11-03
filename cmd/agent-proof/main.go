@@ -92,7 +92,7 @@ func runCmd(args []string) {
 			Command:        args,
 			Workdir:        ".",
 			TimeoutSeconds: 300,
-			Checks:         proof.CheckSpec{Commands: []string{"true"}},
+			Checks:         proof.CheckSpec{}, // No acceptance checks supplied: never fabricate success.
 		}
 	}
 

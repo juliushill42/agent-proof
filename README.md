@@ -169,6 +169,12 @@ machine-state verification
 RECOVERED_AND_VERIFIED   FAIL
 ```
 
+## Evidence boundaries
+
+Direct command mode records the process outcome but supplies no acceptance criteria. Such executions are **UNVERIFIED_NO_CHECKS**, never `VERIFIED_SUCCESS`, and exit nonzero. Use `run --spec` with explicit state checks to obtain a verified result.
+
+`evidence_sha256` is a self-checking **unsigned** digest. An actor who can replace the evidence file can recompute it. It is not a digital signature, remote attestation, or tamper-resistant audit ledger.
+
 ## What a PASS means
 
 A PASS means the configured acceptance checks were observed to pass after execution. It does not treat model text, agent summaries, or a zero process exit code as proof by themselves.
