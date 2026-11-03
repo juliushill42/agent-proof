@@ -265,7 +265,9 @@ func Verify(ctx context.Context, spec RunSpec, before Snapshot) []CheckResult {
 		rp := resolve(wd, p)
 		after := hashFileOrState(rp)
 		prev := before[p]
-		pass := after != prev && !strings.HasPrefix(after, "ERROR:")
+		pass := after != prev && after != "ABSENT" &&
+			!strings.HasPrefix(after, "ERROR:") &&
+			!strings.HasPrefix(prev, "ERROR:")
 		r := CheckResult{Kind: "file_changed", Target: p, Passed: pass, Observed: "before=" + prev + " after=" + after}
 		results = append(results, r)
 	}
