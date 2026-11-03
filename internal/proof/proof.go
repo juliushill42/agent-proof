@@ -312,11 +312,12 @@ func Verify(ctx context.Context, spec RunSpec, before Snapshot) []CheckResult {
 
 	if spec.Checks.GitClean != nil {
 		pr := Run(ctx, []string{"git", "status", "--porcelain"}, wd, 20*time.Second, "", "")
-		clean := pr.ExitCode == 0 && strings.TrimSpace(pr.Stdout) == ""
+		clean := strings.TrimSpace(pr.Stdout) == ""
 		expected := *spec.Checks.GitClean
 		results = append(results, CheckResult{
-			Kind: "git_clean", Target: wd, Passed: clean == expected,
-			Observed: fmt.Sprintf("clean=%v expected=%v", clean, expected),
+			Kind: "git_clean", Target: wd, Passed: pr.ExitCode == 0 && clean == expected,
+			Observed: fmt.Sprintf("exit=%d clean=%v expected=%v", pr.ExitCode, clean, expected),
+			Error: strings.TrimSpace(pr.Stderr),
 		})
 	}
 
@@ -370,6 +371,9 @@ func Classify(proc ProcessResult, checks []CheckResult) string {
 	}
 	if proc.ExitCode != 0 {
 		return "EXECUTION_FAILED"
+	}
+	if len(checks) == 0 {
+		return "UNVERIFIED_NO_CHECKS"
 	}
 	if !AllPassed(checks) {
 		return "FALSE_SUCCESS_OR_PARTIAL_EXECUTION"
@@ -501,6 +505,9 @@ func RunProof(ctx context.Context, spec RunSpec, root string) (Proof, string, er
 	}
 
 	result := "FAIL"
+	if class == "UNVERIFIED_NO_CHECKS" {
+		result = "UNVERIFIED"
+	}
 	if class == "VERIFIED_SUCCESS" || class == "RECOVERED_AND_VERIFIED" {
 		result = "PASS"
 	}
