@@ -1,63 +1,106 @@
-# 🛡️ agent-proof
+# Agent Proof
 
-**Deterministic execution receipts and cryptographic verification for autonomous AI agents.**
+**Verify what an agent actually did—not just what it said it did.**
 
-[![License](https://shields.io)](LICENSE)
-[![Verification](https://shields.io)](#quickstart)
-[![Offline First](https://shields.io)](#architecture)
+[![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![Interactive Lab](https://img.shields.io/badge/Interactive-Agent%20Proof%20Lab-65e5e0)](https://proof.movingwithclarity.com)
 
-> **"Verifiable evidence instead of promises."**  
-> Autonomous agents execute code, call tools, and mutate state—yet most systems rely on mutable text logs to prove what happened. `agent-proof` generates tamper-evident cryptographic receipts for every step an agent takes.
+> **Explore it first:** [proof.movingwithclarity.com](https://proof.movingwithclarity.com) — interactive WebGL visualization, WebGPU capability check, scenario explorer, spec builder, and local execution guide.
 
----
+Agent Proof is a Go command-line tool for running a command against explicit acceptance checks and writing a structured JSON record of the observed process and resulting state. It is designed to catch false success, partial execution, timeouts, and failed recovery.
 
-## ⚡ Why `agent-proof`?
+## What it does
 
-* **Tamper-Evident Execution Receipts:** Binds inputs, environment state, model artifacts, and outputs into verifiable cryptographic commitments (Ristretto255 / Pedersen commitments).
-* **Zero-Trust & Offline-First (`TITAN_OFFLINE=1`):** Runs completely air-gapped with zero external API dependencies. Built for sovereign, edge, and regulated enterprise environments.
-* **Strict Fail-Closed Audits:** Every step must exit `0` and pass prerequisite checks. If a single verification check fails, the overall receipt fails (`OVERALL RESULT: FAIL`).
-* **Drop-In Harness Compatibility:** Wraps existing agent loops, CLI tools, and local inference runtimes (`.gguf` models) without rewriting core agent logic.
+- Executes a configured command with a timeout.
+- Captures exit status, duration, stdout, stderr, and process metadata.
+- Checks configured files, file changes, shell predicates, HTTP status, Git state, and environment values.
+- Classifies timeouts, execution failures, false success / partial execution, verified success, and recovered success.
+- Optionally runs a recovery command, then repeats the configured checks.
+- Writes proof JSON, logs, checkpoints, and a SHA-256 digest.
 
----
+**Integrity boundary:** the SHA-256 digest detects changes when compared with a trusted copy of the original digest. The current format is not a digital signature, remote attestation, Pedersen commitment, or zero-knowledge proof. Anyone who can rewrite the proof can also recompute its digest. Use an independently stored or signed digest when you need an external trust anchor.
 
-## 🚀 Quickstart
+## Interactive lab
 
-Clone the repository and run the local verification suite:
+Open **[Agent Proof Lab](https://proof.movingwithclarity.com)** to:
 
-```bash
-git clone https://github.com
-cd agent-proof
+1. Explore the verification lifecycle in an animated WebGL scene.
+2. Check whether the browser supports WebGPU compute; WebGL remains the visual fallback.
+3. Walk through the five built-in chaos scenarios.
+4. Generate and copy a starter JSON spec.
+5. Follow the commands to run the real Go engine locally.
 
-# Inspect available scripts and tests
-ls -la
-```
+The browser scenarios are explanatory simulations. They do not execute shell commands or produce Go evidence in the browser. Real execution and evidence generation happen through the Go CLI on a machine you control.
 
-### Environment Controls
+## Quickstart
 
-| Variable | Purpose | Example |
-| :--- | :--- | :--- |
-| `TITAN_ROOT` | Target project directory | `TITAN_ROOT=/path/to/dir` |
-| `TITAN_OFFLINE` | Enforce air-gapped execution (forbid network) | `TITAN_OFFLINE=1` |
-| `TITAN_MODEL` | Optional local model artifact to hash into receipt | `TITAN_MODEL=/path/to/model.gguf` |
+Requirements: Go 1.22+ and a shell.
 
----
+    git clone https://github.com/juliushill42/agent-proof.git
+    cd agent-proof
+    go test ./...
+    go build -o ./bin/agent-proof ./cmd/agent-proof
 
-## 🏗️ Verification Lifecycle
+    # Detect a false-success run (the expected scenario result is FAIL).
+    ./bin/agent-proof chaos fake-success --evidence .agent-proof/demo
 
-1. **Pre-Execution Snapshot:** Hashes the target workspace, environment configuration, and optional model artifact.
-2. **Fail-Closed Execution:** Runs target agent steps under strict shell/runtime policies (`set -euo pipefail`).
-3. **Cryptographic Receipt:** Outputs a deterministic receipt binding inputs, execution status, and state transitions so auditors can verify runs without exposing proprietary data.
+    # Run the included sample spec and write evidence.
+    ./bin/agent-proof run --spec spec.example.json --evidence .agent-proof/runs
 
----
+    # List recorded runs.
+    ./bin/agent-proof list --evidence .agent-proof/runs
 
-## 🤝 Contributing
+The run command prints the exact path to the generated proof.json. Verify it with:
 
-We welcome security researchers, cryptography engineers, and agent builders. See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+    ./bin/agent-proof verify-proof .agent-proof/runs/<RUN_ID>/proof.json
 
----
+## Run a command directly
 
-## 🏢 Open Ecosystem & Enterprise Licensing
+    ./bin/agent-proof run -- sh -lc 'mkdir -p dist && printf "built\\n" > dist/app.txt'
 
-`agent-proof` is part of the **TitanU AI** open ecosystem (**Prove. Attract. Monetize.**):
-* **Open Source:** Core verification primitives and receipt schemas are open for developers to inspect, audit, and extend.
-* **Enterprise & Commercial:** Need multi-node attestation, compliance reporting, or custom integration into your proprietary agent stack? Connect with **TitanU Ai LLC** at [titanuai.com](https://titanuai.com) or via [LinkedIn](https://linkedin.com).
+For meaningful acceptance, use a spec with checks that match the artifact or state your workflow must produce. A direct run uses a minimal successful shell predicate; it does not establish that your application is correct.
+
+## Spec format
+
+See [spec.example.json](spec.example.json). Supported check fields:
+
+| Field | What it checks |
+|---|---|
+| files_exist | Each configured path exists after execution. |
+| files_changed | The file state differs from the pre-execution snapshot. |
+| commands | Each shell predicate exits successfully. |
+| http | Each URL returns an HTTP status from 200 through 399. |
+| git_clean | Git working-tree cleanliness matches the requested boolean. |
+| git_commit | Git HEAD resolves to a commit. |
+| env_equals | Named environment variables equal their configured values. |
+| timeout_seconds | Timeout applied to individual command checks. |
+
+The run-level timeout_seconds controls the primary and recovery commands. See the source and tests for exact behavior.
+
+## Chaos scenarios
+
+    ./bin/agent-proof chaos fake-success
+    ./bin/agent-proof chaos hung-agent
+    ./bin/agent-proof chaos partial-execution
+    ./bin/agent-proof chaos recovery
+    ./bin/agent-proof chaos changed-file
+
+The first three scenarios are designed to produce a failed proof; the CLI reports detection of the expected failure. Recovery and changed-file scenarios are designed to produce passing proofs.
+
+## Evidence layout
+
+Each run is written beneath the selected evidence directory in a timestamped run folder. It includes proof.json, request and snapshot data, process output, check results, and checkpoints. The proof includes the observed result, classification, host metadata, and SHA-256 digest.
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Run go test ./... before submitting changes.
+
+## Project
+
+Agent Proof is part of the TitanU open ecosystem.
+
+- Source: [github.com/juliushill42/agent-proof](https://github.com/juliushill42/agent-proof)
+- Interactive experience: [proof.movingwithclarity.com](https://proof.movingwithclarity.com)
+- Moving With Clarity: [movingwithclarity.com](https://movingwithclarity.com)
+- License: [Apache-2.0](LICENSE)
