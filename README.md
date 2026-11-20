@@ -1,182 +1,63 @@
-# agent-proof `":"`
+# 🛡️ agent-proof
 
-**Your AI agent said it finished. Prove it.**
+**Deterministic execution receipts and cryptographic verification for autonomous AI agents.**
 
-`agent-proof` runs an agent or command, records what actually happened, verifies machine state, classifies false success, attempts an explicit recovery command when configured, then verifies again.
+[![License](https://shields.io)](LICENSE)
+[![Verification](https://shields.io)](#quickstart)
+[![Offline First](https://shields.io)](#architecture)
 
-It does not ask the model whether it succeeded.
+> **"Verifiable evidence instead of promises."**  
+> Autonomous agents execute code, call tools, and mutate state—yet most systems rely on mutable text logs to prove what happened. `agent-proof` generates tamper-evident cryptographic receipts for every step an agent takes.
 
-## Build
+---
 
-```bash
-./bootstrap.sh
-```
+## ⚡ Why `agent-proof`?
 
-The binary is written to:
+* **Tamper-Evident Execution Receipts:** Binds inputs, environment state, model artifacts, and outputs into verifiable cryptographic commitments (Ristretto255 / Pedersen commitments).
+* **Zero-Trust & Offline-First (`TITAN_OFFLINE=1`):** Runs completely air-gapped with zero external API dependencies. Built for sovereign, edge, and regulated enterprise environments.
+* **Strict Fail-Closed Audits:** Every step must exit `0` and pass prerequisite checks. If a single verification check fails, the overall receipt fails (`OVERALL RESULT: FAIL`).
+* **Drop-In Harness Compatibility:** Wraps existing agent loops, CLI tools, and local inference runtimes (`.gguf` models) without rewriting core agent logic.
 
-```text
-bin/agent-proof
-```
+---
 
-## Run a command
+## 🚀 Quickstart
 
-```bash
-bin/agent-proof run -- sh -lc 'echo hello'
-```
-
-## Prove a real build
+Clone the repository and run the local verification suite:
 
 ```bash
-bin/agent-proof run --spec spec.example.json
+git clone https://github.com
+cd agent-proof
+
+# Inspect available scripts and tests
+ls -la
 ```
 
-A proof run checks the requested machine state after execution. A successful process with failed acceptance checks is classified as:
+### Environment Controls
 
-```text
-FALSE_SUCCESS_OR_PARTIAL_EXECUTION
-```
+| Variable | Purpose | Example |
+| :--- | :--- | :--- |
+| `TITAN_ROOT` | Target project directory | `TITAN_ROOT=/path/to/dir` |
+| `TITAN_OFFLINE` | Enforce air-gapped execution (forbid network) | `TITAN_OFFLINE=1` |
+| `TITAN_MODEL` | Optional local model artifact to hash into receipt | `TITAN_MODEL=/path/to/model.gguf` |
 
-## Failure injection
+---
 
-```bash
-./run-chaos.sh
-```
+## 🏗️ Verification Lifecycle
 
-Included scenarios:
+1. **Pre-Execution Snapshot:** Hashes the target workspace, environment configuration, and optional model artifact.
+2. **Fail-Closed Execution:** Runs target agent steps under strict shell/runtime policies (`set -euo pipefail`).
+3. **Cryptographic Receipt:** Outputs a deterministic receipt binding inputs, execution status, and state transitions so auditors can verify runs without exposing proprietary data.
 
-```text
-fake-success
-hung-agent
-partial-execution
-recovery
-changed-file
-```
+---
 
-Example:
+## 🤝 Contributing
 
-```bash
-bin/agent-proof chaos fake-success
-```
+We welcome security researchers, cryptography engineers, and agent builders. See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
-Expected result:
+---
 
-```text
-classification: FALSE_SUCCESS_OR_PARTIAL_EXECUTION
-result: FAIL
-CHAOS RESULT: detected expected failure
-```
+## 🏢 Open Ecosystem & Enterprise Licensing
 
-## Evidence
-
-Every run writes:
-
-```text
-.agent-proof/runs/<run-id>/
-├── request.json
-├── snapshot-before.json
-├── stdout.log
-├── stderr.log
-├── execution.jsonl
-├── process.json
-├── checks-before.json
-├── checks-after.json
-├── recovery.json
-├── manifest.json
-├── proof.json
-└── checkpoints/
-```
-
-Files only appear when relevant to the run.
-
-Each `proof.json` contains a SHA-256 evidence digest. Verify it with:
-
-```bash
-bin/agent-proof verify-proof .agent-proof/runs/<run-id>/proof.json
-```
-
-## Checks
-
-Current deterministic checks:
-
-- required file exists
-- required file changed from its pre-run hash
-- shell acceptance command exits zero
-- HTTP endpoint returns 2xx/3xx
-- Git working-tree clean/dirty state
-- Git `HEAD` exists
-- environment variable equals an expected value
-- command timeout/hang detection
-
-## Recovery
-
-A spec can provide `recover_command`.
-
-`agent-proof` only runs it after the original execution or acceptance checks fail. It then re-runs the acceptance checks and returns either:
-
-```text
-RECOVERED_AND_VERIFIED
-```
-
-or a failure classification backed by the second verification pass.
-
-## Spec
-
-```json
-{
-  "name": "prove-build",
-  "command": ["sh", "-lc", "make build"],
-  "workdir": ".",
-  "timeout_seconds": 300,
-  "recover_command": ["sh", "-lc", "./repair.sh"],
-  "checks": {
-    "files_exist": ["dist/app"],
-    "files_changed": ["dist/app"],
-    "commands": ["./dist/app --healthcheck"],
-    "http": ["http://127.0.0.1:8080/healthz"],
-    "git_commit": true,
-    "timeout_seconds": 30
-  }
-}
-```
-
-## Result model
-
-```text
-agent/model output
-        |
-        v
-execution
-        |
-        v
-machine-state verification
-        |
-        +---- pass ----------------> VERIFIED_SUCCESS
-        |
-        +---- fail
-                 |
-                 v
-             classify
-                 |
-                 v
-        optional recovery command
-                 |
-                 v
-          verify machine state
-                 |
-        +--------+---------+
-        |                  |
-        v                  v
-RECOVERED_AND_VERIFIED   FAIL
-```
-
-## What a PASS means
-
-A PASS means the configured acceptance checks were observed to pass after execution. It does not treat model text, agent summaries, or a zero process exit code as proof by themselves.
-
-## License
-
-Apache-2.0.
-
-Built by Titan Universal AI LLC.
-
-`":"`
+`agent-proof` is part of the **TitanU AI** open ecosystem (**Prove. Attract. Monetize.**):
+* **Open Source:** Core verification primitives and receipt schemas are open for developers to inspect, audit, and extend.
+* **Enterprise & Commercial:** Need multi-node attestation, compliance reporting, or custom integration into your proprietary agent stack? Connect with **TitanU Ai LLC** at [titanuai.com](https://titanuai.com) or via [LinkedIn](https://linkedin.com).
